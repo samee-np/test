@@ -1,0 +1,65 @@
+name: release
+
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: 0 4 * * * # Change HERE to set build schedule
+
+env:
+  COUNTRY: United States # [!] Do not change. This env is used to find fast mirror server. (Github Actions' workers are running in US.)
+  REPO_DIR: /tmp/repo
+  BUILD_DIR: /tmp/build
+  CCACHE_DIR: /tmp/ccache
+  GIT_REMOTE: https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}.git
+  GIT_BRANCH: gh-pages
+  GIT_COMMIT_SHA: ${{ github.sha }}
+
+jobs:
+  build:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    strategy:
+      matrix:
+        package:
+          - yay-bin # [!] You should not remove this. This workflow uses self-built yay to build other packages.
+          # Add packages you want HERE
+          # - zoom
+          # - google-chrome
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          key: cache-${{ matrix.package }}
+          path: |
+            ${{ env.BUILD_DIR }}
+            ${{ env.CCACHE_DIR }}
+      - run: |
+          ./tasks.sh initialize
+      - run: |
+          ./tasks.sh package ${{ matrix.package }}
+      - uses: actions/upload-artifact@v2
+        with:
+          name: artifact-${{ matrix.package }}
+          path: ${{ env.BUILD_DIR }}
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          path: ${{ env.BUILD_DIR }}
+      - run: |
+          ./tasks.sh repository
+      - run: |
+          ./tasks.sh setup_git
+      - run: |
+          ./tasks.sh commit
+      - run: |
+          ./tasks.sh push
