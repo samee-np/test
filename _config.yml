@@ -1,0 +1,3 @@
+title: "@samee-np's ArchLinux package repository"
+plugins:
+  - jekyll-readme-index
